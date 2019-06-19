@@ -257,6 +257,7 @@ public class ExcelUtil<T> {
                     Field aField = findField(clazz, str);
                     tempMap.put(aField, flag++);
                 }
+                // 合理
                 associateMap.put(field, tempMap);
             }
         }
