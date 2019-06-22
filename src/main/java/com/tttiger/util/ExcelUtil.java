@@ -23,24 +23,33 @@ public class ExcelUtil<T> {
      */
     public static final String EXCEl_FILE_2007 = "2007";
 
-
+    /**
+     * 字符串是否为数字验证
+     */
     private final Pattern pattern = Pattern.compile("^//d+(//.//d+)?$");
 
+    /**
+     * 保存普通导出属性
+     */
+    private Map<Field, Integer> fieldMap = new HashMap<>();
 
-    public void qExportExcel(String title, List<T> dataset, HttpServletResponse response) throws IllegalAccessException, IOException, ExcelAnnotationException {
-        OutputStream out = response.getOutputStream();
-        response.setCharacterEncoding("UTF-8");
-        response.setContentType("application/vnd.ms-excel;charset=UTF-8");
-        response.setHeader("Content-Disposition", "attachment;filename=" + title + ".xls");
-        if (dataset.isEmpty()) {
+    /**
+     * 保存复合导出属性
+     */
+    private Map<Field, Map<Field, Integer>> associateMap = new HashMap<>();
+
+    /**
+     * 保存导出标题
+     */
+    private List<String> headers = new ArrayList<>();
+
+
+    public void ExportExcel(String title, List<T> dataset, OutputStream response) throws IllegalAccessException, IOException, ExcelAnnotationException {
+        if (dataset == null || dataset.isEmpty()) {
             return;
         }
-
-        T t = dataset.get(0);
-        Field[] fields = t.getClass().getDeclaredFields();
-        List<String> headers = new ArrayList<>();
-        // 获取标题行
-        createHeader(headers, fields);
+        // 初始化
+        init(dataset);
 
         // 声明一个工作薄
         XSSFWorkbook workbook = new XSSFWorkbook();
@@ -58,62 +67,42 @@ public class ExcelUtil<T> {
         int rowIndex = 1;
         for (T tempObj : dataset) {
             XSSFRow row = sheet.createRow(rowIndex);
-            int cellIndex = 0;
-            for (Field tempF : fields) {
-                tempF.setAccessible(true);
-                // 如果不是自定义类型,直接设置单元格
-                if (tempF.isAnnotationPresent(ExcelField.class)) {
-                    XSSFCell cell = row.createCell(cellIndex);
-                    Object var1 = tempF.get(tempObj);
-                    setCellValue(tempF, cell, var1);
-                    cellIndex++;
-                    // 是复合类型,需要找到需要设置的,符合类属性
-                } else if (tempF.isAnnotationPresent(ExcelAssociate.class)) {
-                    String[] fieldNames = tempF.getAnnotation(ExcelAssociate.class).value();
-                    Object var1 = tempF.get(tempObj);
-                    Class<?> declaringClass = tempF.getType();
-                    for (String str : fieldNames) {
-                        XSSFCell cell = row.createCell(cellIndex);
-                        Field f = findField(declaringClass, str);
-                        f.setAccessible(true);
-                        Object var2 = f.get(var1);
-                        setCellValue(f, cell, var2);
-                        cellIndex++;
+            for (int i = 0; i < headers.size(); i++) {
+                Set<Map.Entry<Field, Integer>> entries = fieldMap.entrySet();
+                // 设置普通属性
+                for (Map.Entry<Field, Integer> entry : entries) {
+                    Object obj = entry.getKey().get(tempObj);
+                    XSSFCell cell = row.createCell(entry.getValue());
+                    setCellValue(entry.getKey(), cell, obj);
+                }
+                // 设置复合属性,关联属性
+                Set<Map.Entry<Field, Map<Field, Integer>>> tempEntry = associateMap.entrySet();
+                // 每个关联属性
+                for (Map.Entry<Field, Map<Field, Integer>> mapEntry : tempEntry) {
+                    // 复合属性值
+                    Object obj = mapEntry.getKey().get(tempObj);
+                    // 复合属性所需导出字段
+                    Set<Map.Entry<Field, Integer>> fieldEntry = mapEntry.getValue().entrySet();
+                    for (Map.Entry<Field, Integer> entry1 : fieldEntry) {
+                        entry1.getKey().setAccessible(true);
+                        Object obj2 = entry1.getKey().get(obj);
+                        XSSFCell cell = row.createCell(entry1.getValue());
+                        setCellValue(entry1.getKey(), cell, obj2);
                     }
                 }
             }
             rowIndex++;
         }
-        workbook.write(out);
+/*        OutputStream out = response.getOutputStream();
+        response.setCharacterEncoding("UTF-8");
+        response.setContentType("application/vnd.ms-excel;charset=UTF-8");
+        response.setHeader("Content-Disposition", "attachment;filename=" + title + ".xls");*/
+        workbook.write(response);
     }
 
 
     /**
-     * 为状态属性设置值
-     *
-     * @param status 属性状态标识
-     * @param cell   单元格
-     * @param obj    属性值
-     */
-
-    private void setStatusField(ExcelFieldStatus status, XSSFCell cell, Object obj) {
-        Status[] value = status.value();
-        for (Status s : value) {
-            int var1 = s.value();
-            // 状态是数值类型,全部当做Integer来比较
-            if (obj instanceof Byte || obj instanceof Short || obj instanceof Integer || obj instanceof Long) {
-                if (Integer.valueOf(obj.toString()).equals(var1)) {
-                    cell.setCellValue(s.name());
-                    return;
-                }
-            }
-
-        }
-        setCellValue(cell, obj);
-    }
-
-    /**
-     * 查找属性
+     * 根据名字查找属性field
      *
      * @param clazz 类
      * @param name  属性名
@@ -132,12 +121,12 @@ public class ExcelUtil<T> {
     /**
      * 为单元格设置值
      *
-     * @param field 属性
+     * @param field 属性类型
      * @param cell  单元格
      * @param value 属性值
      * @throws ExcelAnnotationException 注解使用不正确
      */
-    private void setCellValue(Field field, XSSFCell cell, Object value) throws ExcelAnnotationException {
+    private void setCellValue(Field field, XSSFCell cell, Object value) {
         if (field.getAnnotation(ExcelField.class).status()) {
             if (field.isAnnotationPresent(ExcelFieldStatus.class)) {
                 ExcelFieldStatus annotation = field.getAnnotation(ExcelFieldStatus.class);
@@ -151,27 +140,26 @@ public class ExcelUtil<T> {
     }
 
     /**
-     * 根据注解生成Excel标题头
+     * 为状态属性设置值
      *
-     * @param headers 存放标题头的数组
-     * @param fields  查找的属性
+     * @param status 属性状态标识
+     * @param cell   单元格
+     * @param obj    属性值
      */
-    private void createHeader(List<String> headers, Field[] fields) {
-        for (Field field : fields) {
-            if (field.isAnnotationPresent(ExcelField.class)) {
-                String value = field.getAnnotation(ExcelField.class).value();
-                headers.add(value);
-            } else if (field.isAnnotationPresent(ExcelAssociate.class)) {
-                String[] fieldName = field.getAnnotation(ExcelAssociate.class).value();
-                Class<?> declaringClass = field.getType();
-                for (String str : fieldName) {
-                    Field f = findField(declaringClass, str);
-                    if (f.isAnnotationPresent(ExcelField.class)) {
-                        headers.add(f.getAnnotation(ExcelField.class).value());
-                    }
+    private void setStatusField(ExcelFieldStatus status, XSSFCell cell, Object obj) {
+        Status[] value = status.value();
+        for (Status s : value) {
+            int var1 = s.value();
+            // 状态是数值类型,全部当做Integer来比较
+            if (obj instanceof Byte || obj instanceof Short || obj instanceof Integer || obj instanceof Long) {
+                if (Integer.valueOf(obj.toString()).equals(var1)) {
+                    cell.setCellValue(s.name());
+                    return;
                 }
             }
+
         }
+        setCellValue(cell, obj);
     }
 
     /**
@@ -221,20 +209,18 @@ public class ExcelUtil<T> {
     }
 
 
-
-    private Map<Field, Integer> fieldMap = new HashMap<>();
-
-    private Map<Field, Map<Field, Integer>> associateMap = new HashMap<>();
-
-    public void findField(List<T> entity) {
-        if (entity == null || entity.isEmpty()) {
-            return;
-        }
+    /**
+     * 初始化工具类
+     *
+     * @param entity 导出实体集合
+     */
+    private void init(List<T> entity) {
         Class<?> clazz = entity.get(0).getClass();
         Field[] declaredFields = clazz.getDeclaredFields();
         List<Field> commonField = new ArrayList<>();
         for (Field field : declaredFields) {
             if (field.isAnnotationPresent(ExcelField.class) || field.isAnnotationPresent(ExcelAssociate.class)) {
+                field.setAccessible(true);
                 commonField.add(field);
             }
         }
@@ -246,18 +232,28 @@ public class ExcelUtil<T> {
                     y.getAnnotation(ExcelAssociate.class).sort();
             return var1 - var2;
         });
-        int flag = 1;
+        int flag = 0;
         for (Field field : commonField) {
             if (field.isAnnotationPresent(ExcelField.class)) {
+                // 添加到标题头
+                headers.add(field.getAnnotation(ExcelField.class).value());
+                // 普通属性放入
                 fieldMap.put(field, flag++);
             } else if (field.isAnnotationPresent(ExcelAssociate.class)) {
+                // 复合属性
                 String[] names = field.getAnnotation(ExcelAssociate.class).value();
                 Map<Field, Integer> tempMap = new HashMap<>();
                 for (String str : names) {
-                    Field aField = findField(clazz, str);
+                    // 找到复合属性需要注入的值
+                    Field aField = findField(field.getType(), str);
+                    if (!aField.isAnnotationPresent(ExcelField.class)) {
+                        throw new ExcelAnnotationException("复合属性未找到");
+                    }
+                    headers.add(aField.getAnnotation(ExcelField.class).value());
+                    // 放入临时map
                     tempMap.put(aField, flag++);
                 }
-                // 合理
+                // 复合属性与复合属性字段
                 associateMap.put(field, tempMap);
             }
         }
