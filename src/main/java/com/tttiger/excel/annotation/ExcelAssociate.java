@@ -19,5 +19,5 @@ public @interface ExcelAssociate {
     /**
      * 排序字段
      */
-    int sort() default 0;
+    int sort() default Integer.MAX_VALUE;
 }

@@ -26,5 +26,10 @@ public @interface ExcelField{
     /**
      * 字段是否参与排序
      */
-    int sort() default 0;
+    int sort() default Integer.MAX_VALUE;
+
+    /**
+     * 属性应用的样式
+     */
+    Class<? extends ExcelFieldStyle> style() default DefaultExcelFieldStyle.class;
 }

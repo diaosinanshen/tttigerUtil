@@ -19,11 +19,6 @@ import java.util.regex.Pattern;
 public class ExcelUtil<T> {
 
     /**
-     * 2007 版本以上 最大支持1048576行
-     */
-    public static final String EXCEl_FILE_2007 = "2007";
-
-    /**
      * 字符串是否为数字验证
      */
     private final Pattern pattern = Pattern.compile("^//d+(//.//d+)?$");
@@ -43,8 +38,28 @@ public class ExcelUtil<T> {
      */
     private List<String> headers = new ArrayList<>();
 
+    /**
+     * @param title    文件标题
+     * @param dataset  集合数据
+     * @param response Http响应
+     * @throws IllegalAccessException
+     * @throws IOException
+     */
+    public void ExportExcel(String title, List<T> dataset, HttpServletResponse response) throws IllegalAccessException, IOException {
+        response.setCharacterEncoding("UTF-8");
+        response.setContentType("application/vnd.ms-excel;charset=UTF-8");
+        response.setHeader("Content-Disposition", "attachment;filename=" + title + ".xls");
+        ExportExcel(title, dataset, response.getOutputStream());
+    }
 
-    public void ExportExcel(String title, List<T> dataset, OutputStream response) throws IllegalAccessException, IOException, ExcelAnnotationException {
+    /**
+     * @param title   文件标题
+     * @param dataset 集合数据
+     * @param stream  导出流
+     * @throws IllegalAccessException
+     * @throws IOException
+     */
+    public void ExportExcel(String title, List<T> dataset, OutputStream stream) throws IllegalAccessException, IOException {
         if (dataset == null || dataset.isEmpty()) {
             return;
         }
@@ -55,10 +70,14 @@ public class ExcelUtil<T> {
         XSSFWorkbook workbook = new XSSFWorkbook();
         // 生成一个表格
         XSSFSheet sheet = workbook.createSheet(title);
+        workbook.createCellStyle()
         // 设置表格默认列宽度为15个字节
         sheet.setDefaultColumnWidth(20);
         // 设置标题行
         XSSFRow row0 = sheet.createRow(0);
+
+
+        // 生成标题头
         for (int i = 0; i < headers.size(); i++) {
             XSSFCell cell = row0.createCell(i);
             cell.setCellValue(headers.get(i));
@@ -73,6 +92,7 @@ public class ExcelUtil<T> {
                 for (Map.Entry<Field, Integer> entry : entries) {
                     Object obj = entry.getKey().get(tempObj);
                     XSSFCell cell = row.createCell(entry.getValue());
+                    cell.setCellStyle(style);
                     setCellValue(entry.getKey(), cell, obj);
                 }
                 // 设置复合属性,关联属性
@@ -87,19 +107,15 @@ public class ExcelUtil<T> {
                         entry1.getKey().setAccessible(true);
                         Object obj2 = entry1.getKey().get(obj);
                         XSSFCell cell = row.createCell(entry1.getValue());
+                        cell.setCellStyle(style);
                         setCellValue(entry1.getKey(), cell, obj2);
                     }
                 }
             }
             rowIndex++;
         }
-/*        OutputStream out = response.getOutputStream();
-        response.setCharacterEncoding("UTF-8");
-        response.setContentType("application/vnd.ms-excel;charset=UTF-8");
-        response.setHeader("Content-Disposition", "attachment;filename=" + title + ".xls");*/
-        workbook.write(response);
+        workbook.write(stream);
     }
-
 
     /**
      * 根据名字查找属性field
