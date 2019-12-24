@@ -70,7 +70,7 @@ public class ExcelUtil<T> {
         XSSFWorkbook workbook = new XSSFWorkbook();
         // 生成一个表格
         XSSFSheet sheet = workbook.createSheet(title);
-        workbook.createCellStyle()
+        XSSFCellStyle cellStyle = workbook.createCellStyle();
         // 设置表格默认列宽度为15个字节
         sheet.setDefaultColumnWidth(20);
         // 设置标题行
