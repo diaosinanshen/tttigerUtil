@@ -1,12 +1,17 @@
 package com.tttiger.util;
 
+import com.tttiger.excel.DefaultExcelHeaderBodyStyle;
+import com.tttiger.excel.ExcelHeaderBodyStyle;
 import com.tttiger.excel.annotation.*;
 import org.apache.poi.xssf.usermodel.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -37,20 +42,39 @@ public class ExcelUtil<T> {
     /**
      * 保存导出标题
      */
-    private List<String> headers = new ArrayList<>();
+    private Map<String, Integer> headers = new LinkedHashMap<>();
 
     /**
-     * @param title    文件标题
-     * @param dataset  集合数据
+     * 保存标题头样式
+     */
+    private ExcelHeaderBodyStyle excelHeaderBodyStyle;
+
+    /**
+     * 是否包含数据收集列
+     */
+    private boolean hasCollect = false;
+
+    /**
+     * 保存需要收集的属性
+     */
+    private Map<Field, Integer> collectFieldMap = new HashMap<>();
+    /**
+     * 保存收集的结果
+     */
+    private Map<Integer, BigDecimal> collectResult = new HashMap<>();
+
+    /**
+     * @param fileName 文件标题
+     * @param data     集合数据
      * @param response Http响应
      * @throws IllegalAccessException
      * @throws IOException
      */
-    public void ExportExcel(String title, List<T> dataset, HttpServletResponse response) throws IllegalAccessException, IOException {
+    public void exportExcel(String fileName, List<T> data, HttpServletResponse response) throws IllegalAccessException, IOException {
         response.setCharacterEncoding("UTF-8");
         response.setContentType("application/vnd.ms-excel;charset=UTF-8");
-        response.setHeader("Content-Disposition", "attachment;filename=" + title + ".xls");
-        ExportExcel(title, dataset, response.getOutputStream());
+        response.setHeader("Content-Disposition", "attachment;filename=" + fileName + ".xls");
+        ExportExcel(fileName, data, response.getOutputStream());
     }
 
     /**
@@ -66,56 +90,100 @@ public class ExcelUtil<T> {
         }
         // 初始化
         init(dataset);
-
         // 声明一个工作薄
         XSSFWorkbook workbook = new XSSFWorkbook();
         // 生成一个表格
         XSSFSheet sheet = workbook.createSheet(title);
-        XSSFCellStyle cellStyle = workbook.createCellStyle();
-        // 设置表格默认列宽度为15个字节
-        sheet.setDefaultColumnWidth(20);
+
+
+        int startColumn = 0;
+        int startRow = 0;
         // 设置标题行
-        XSSFRow row0 = sheet.createRow(0);
-
-
+        XSSFFont headerFont = workbook.createFont();
+        XSSFCellStyle headerStyle = workbook.createCellStyle();
+        this.excelHeaderBodyStyle.headerStyle(headerStyle, headerFont);
+        headerStyle.setFont(headerFont);
+        XSSFRow row0 = sheet.createRow(startRow);
         // 生成标题头
-        for (int i = 0; i < headers.size(); i++) {
-            XSSFCell cell = row0.createCell(i);
-            cell.setCellValue(headers.get(i));
+        for (Map.Entry<String, Integer> entry : headers.entrySet()) {
+            XSSFCell cell = row0.createCell(startColumn);
+            cell.setCellValue(entry.getKey());
+            cell.setCellStyle(headerStyle);
+            sheet.setColumnWidth(startColumn, entry.getValue());
+            startColumn++;
         }
 
-        int rowIndex = 1;
+        int rowIndex = startRow + 1;
+        XSSFCellStyle bodyStyle = workbook.createCellStyle();
+        XSSFFont bodyFont = workbook.createFont();
+        this.excelHeaderBodyStyle.bodyStyle(bodyStyle, bodyFont);
+        bodyStyle.setFont(bodyFont);
+        // 普通属性映射
+        Set<Map.Entry<Field, Integer>> entries = fieldMap.entrySet();
+        // 设置复合属性,关联属性
+        Set<Map.Entry<Field, Map<Field, Integer>>> tempEntry = associateMap.entrySet();
         for (T tempObj : dataset) {
             XSSFRow row = sheet.createRow(rowIndex);
-            for (int i = 0; i < headers.size(); i++) {
-                Set<Map.Entry<Field, Integer>> entries = fieldMap.entrySet();
-                // 设置普通属性
-                for (Map.Entry<Field, Integer> entry : entries) {
-                    Object obj = entry.getKey().get(tempObj);
-                    XSSFCell cell = row.createCell(entry.getValue());
-//                    cell.setCellStyle(style);
-                    setCellValue(entry.getKey(), cell, obj);
-                }
-                // 设置复合属性,关联属性
-                Set<Map.Entry<Field, Map<Field, Integer>>> tempEntry = associateMap.entrySet();
-                // 每个关联属性
-                for (Map.Entry<Field, Map<Field, Integer>> mapEntry : tempEntry) {
-                    // 复合属性值
-                    Object obj = mapEntry.getKey().get(tempObj);
-                    // 复合属性所需导出字段
-                    Set<Map.Entry<Field, Integer>> fieldEntry = mapEntry.getValue().entrySet();
-                    for (Map.Entry<Field, Integer> entry1 : fieldEntry) {
-                        entry1.getKey().setAccessible(true);
-                        Object obj2 = entry1.getKey().get(obj);
-                        XSSFCell cell = row.createCell(entry1.getValue());
-//                        cell.setCellStyle(style);
-                        setCellValue(entry1.getKey(), cell, obj2);
-                    }
+            // 设置普通属性
+            for (Map.Entry<Field, Integer> entry : entries) {
+                Object obj = entry.getKey().get(tempObj);
+                XSSFCell cell = row.createCell(entry.getValue());
+                cell.setCellStyle(bodyStyle);
+                setCellValue(entry.getKey(), cell, obj);
+                // 尝试收集汇总数据
+                collectResult(entry, obj);
+            }
+            // 每个关联属性
+            for (Map.Entry<Field, Map<Field, Integer>> mapEntry : tempEntry) {
+                // 复合属性值
+                Object obj = mapEntry.getKey().get(tempObj);
+                // 复合属性所需导出字段
+                Set<Map.Entry<Field, Integer>> fieldEntry = mapEntry.getValue().entrySet();
+                for (Map.Entry<Field, Integer> entry1 : fieldEntry) {
+                    entry1.getKey().setAccessible(true);
+                    Object obj2 = entry1.getKey().get(obj);
+                    XSSFCell cell = row.createCell(entry1.getValue());
+                    cell.setCellStyle(bodyStyle);
+                    setCellValue(entry1.getKey(), cell, obj2);
+                    collectResult(entry1, obj2);
                 }
             }
             rowIndex++;
         }
+        if (hasCollect) {
+            XSSFRow resultRow = sheet.createRow(rowIndex);
+            XSSFCellStyle collectStyle = workbook.createCellStyle();
+            XSSFFont collectFont = workbook.createFont();
+            this.excelHeaderBodyStyle.collectStyle(collectStyle,collectFont);
+            collectStyle.setFont(collectFont);
+            for (Map.Entry<Integer, BigDecimal> entry : collectResult.entrySet()) {
+                XSSFCell resultCell = resultRow.createCell(entry.getKey());
+                resultCell.setCellStyle(collectStyle);
+                resultCell.setCellValue(entry.getValue().doubleValue());
+            }
+        }
         workbook.write(stream);
+    }
+
+    private void setHeaders(XSSFRow row){
+
+    }
+
+    /**
+     * 收集汇总数据列
+     */
+    private void collectResult(Map.Entry<Field, Integer> entry, Object object) throws IllegalAccessException {
+        if (this.hasCollect && collectFieldMap.get(entry.getKey()) != null) {
+            Integer collectIndex = collectFieldMap.get(entry.getKey());
+            entry.getKey().setAccessible(true);
+            if (collectResult.get(collectIndex) == null) {
+                collectResult.put(collectIndex, new BigDecimal(object + ""));
+            } else {
+                BigDecimal previousNum = collectResult.get(collectIndex);
+                BigDecimal afterNum = previousNum.add(new BigDecimal(object + ""));
+                collectResult.put(collectIndex, afterNum);
+            }
+        }
     }
 
     /**
@@ -227,12 +295,27 @@ public class ExcelUtil<T> {
 
 
     /**
-     * 初始化工具类
+     * 初始化
      *
      * @param entity 导出实体集合
      */
     private void init(List<T> entity) {
         Class<?> clazz = entity.get(0).getClass();
+
+        // 获取表格默认表头，表体样式
+        if (clazz.isAnnotationPresent(ExcelStyle.class)) {
+            Class<? extends ExcelHeaderBodyStyle> styleClazz = clazz.getAnnotation(ExcelStyle.class).excelStyle();
+            try {
+                Constructor<? extends ExcelHeaderBodyStyle> constructor = styleClazz.getConstructor();
+                this.excelHeaderBodyStyle = constructor.newInstance();
+            } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+                e.printStackTrace();
+            }
+        } else {
+            this.excelHeaderBodyStyle = new DefaultExcelHeaderBodyStyle();
+        }
+
+        // 获取需要导出属性排序
         Field[] declaredFields = clazz.getDeclaredFields();
         List<Field> commonField = new ArrayList<>();
         for (Field field : declaredFields) {
@@ -249,13 +332,20 @@ public class ExcelUtil<T> {
                     y.getAnnotation(ExcelAssociate.class).sort();
             return var1 - var2;
         });
+        // 初始化标题头，和对应映射关系
         int flag = 0;
         for (Field field : commonField) {
             if (field.isAnnotationPresent(ExcelField.class)) {
                 // 添加到标题头
-                headers.add(field.getAnnotation(ExcelField.class).value());
+                ExcelField ex = field.getAnnotation(ExcelField.class);
+                headers.put(ex.value(), ex.width());
                 // 普通属性放入
-                fieldMap.put(field, flag++);
+                fieldMap.put(field, flag);
+                if (ex.collect()) {
+                    this.hasCollect = true;
+                    collectFieldMap.put(field, flag);
+                }
+                flag++;
             } else if (field.isAnnotationPresent(ExcelAssociate.class)) {
                 // 复合属性
                 String[] names = field.getAnnotation(ExcelAssociate.class).value();
@@ -263,12 +353,18 @@ public class ExcelUtil<T> {
                 for (String str : names) {
                     // 找到复合属性需要注入的值
                     Field aField = findField(field.getType(), str);
-                    if (!aField.isAnnotationPresent(ExcelField.class)) {
+                    if (aField == null || !aField.isAnnotationPresent(ExcelField.class)) {
                         throw new ExcelAnnotationException("复合属性未找到");
                     }
-                    headers.add(aField.getAnnotation(ExcelField.class).value());
+                    ExcelField af = aField.getAnnotation(ExcelField.class);
+                    headers.put(af.value(), af.width());
                     // 放入临时map
-                    tempMap.put(aField, flag++);
+                    tempMap.put(aField, flag);
+                    if (af.collect()) {
+                        this.hasCollect = true;
+                        collectFieldMap.put(field, flag);
+                    }
+                    flag++;
                 }
                 // 复合属性与复合属性字段
                 associateMap.put(field, tempMap);

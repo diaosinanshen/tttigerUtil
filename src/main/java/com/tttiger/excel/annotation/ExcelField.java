@@ -29,6 +29,16 @@ public @interface ExcelField{
     int sort() default Integer.MAX_VALUE;
 
     /**
+     * 属性对应列的宽度
+     */
+    int width() default 4000;
+
+    /**
+     * 是否对列开启数据汇总，必须为数字类型
+     */
+    boolean collect() default false;
+
+    /**
      * 属性应用的样式
      */
     Class<? extends ExcelFieldStyle> style() default DefaultExcelFieldStyle.class;

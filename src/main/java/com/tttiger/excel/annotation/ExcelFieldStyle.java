@@ -9,7 +9,7 @@ import org.apache.poi.ss.usermodel.Workbook;
 public interface ExcelFieldStyle {
 
     /**
-     * @return 单元格样式
+     * @return 标题行样式
      */
     void headerStyle(CellStyle style);
 

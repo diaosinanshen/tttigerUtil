@@ -12,15 +12,21 @@ public class ResultMap {
      * 统一失败响应状态码
      */
     public static final int FAILED = 0;
-
     /**
      * 统一成功响应状态码
      */
     public static final int SUCCESS = 1;
-
-
+    /**
+     * 响应状态
+     */
     private Integer status;
+    /**
+     * 响应消息
+     */
     private String message;
+    /**
+     * 响应数据
+     */
     private Object data;
 
     public static ResultMap ok() {
@@ -56,6 +62,7 @@ public class ResultMap {
 
     /**
      * 如果 == null 返回失败响应，否则将obj设置为data返回
+     *
      * @param obj data
      * @return 同一结果
      */
@@ -68,6 +75,7 @@ public class ResultMap {
 
     /**
      * 如果 == null 返回失败响应，否则将obj设置为data返回，并设置错误响应消息
+     *
      * @param obj data
      * @return 同一结果
      */

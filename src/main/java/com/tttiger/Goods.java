@@ -21,6 +21,7 @@ public class Goods {
         goods.setGoodsId("12312");
         goods.setGoodsName("商品名称");
         goods.setStatus(1);
+        goods.setPrice(1.8);
         GoodsType type = new GoodsType();
         type.setTypeId("999");
         type.setTypeName("食品");
@@ -44,6 +45,9 @@ public class Goods {
 
     @ExcelAssociate(value = {"typeId", "typeName"}, sort = -1)
     private GoodsType goodsType;
+
+    @ExcelField(value = "价格",collect = true)
+    private Double price;
 
     public String getGoodsId() {
         return goodsId;
@@ -71,6 +75,14 @@ public class Goods {
 
     public GoodsType getGoodsType() {
         return goodsType;
+    }
+
+    public Double getPrice() {
+        return price;
+    }
+
+    public void setPrice(Double price) {
+        this.price = price;
     }
 
     public void setGoodsType(GoodsType goodsType) {

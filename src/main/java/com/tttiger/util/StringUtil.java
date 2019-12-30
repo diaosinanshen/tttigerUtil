@@ -1,8 +1,6 @@
 package com.tttiger.util;
 
 
-import java.security.MessageDigest;
-
 /**
  * 字符串相关方法
  *
@@ -20,8 +18,54 @@ public class StringUtil {
     }
 
 
+    private final static String UNDERLINE = "_";
+
+    /***
+     * 下划线命名转为驼峰命名
+     * @param para 下划线命名的字符串
+     * @return 驼峰命名字符串
+     */
+    public static String underlineToHump(String para) {
+        StringBuilder result = new StringBuilder();
+        String [] a = para.split(UNDERLINE);
+        for (String s : a) {
+            if (!para.contains(UNDERLINE)) {
+                result.append(s);
+                continue;
+            }
+            if (result.length() == 0) {
+                result.append(s.toLowerCase());
+            } else {
+                result.append(s.substring(0, 1).toUpperCase());
+                result.append(s.substring(1).toLowerCase());
+            }
+        }
+        return result.toString();
+    }
+
+    /***
+     * 驼峰命名转为下划线命名
+     * @param para 驼峰命名的字符串
+     * @return 下划线命名字符串
+     */
+    public static String humpToUnderline(String para) {
+        StringBuilder sb = new StringBuilder(para);
+        int temp = 0;
+        if (!para.contains(UNDERLINE)) {
+            for (int i = 0; i < para.length(); i++) {
+                if (Character.isUpperCase(para.charAt(i))) {
+                    sb.insert(i + temp, UNDERLINE);
+                    temp += 1;
+                }
+            }
+        }
+        return sb.toString().toUpperCase();
+    }
+
+
     /**
      * 首字母转小写
+     *
      * @param str 转换字符串
      * @return 首字母转为小写
      */
@@ -34,9 +78,9 @@ public class StringUtil {
         }
     }
 
-
     /**
      * 首字母转大写
+     *
      * @param str 转换字符串
      * @return 首字母转为大写
      */
@@ -52,6 +96,7 @@ public class StringUtil {
      * 给定一个url判断url是否是一级路径
      * 一级路径:/root
      * 二级路径:/root/path
+     *
      * @param path url路径
      * @return 是否为一级路径
      */
@@ -60,43 +105,6 @@ public class StringUtil {
     }
 
 
-    /**
-     * 盐值加密字符
-     *
-     * @param param 加密字符串
-     * @param salt  盐
-     * @return 加密字符串
-     */
-    public static String md5(String param, String salt) {
-        return md5(param + salt);
+    private StringUtil() {
     }
-
-    /**
-     * 加密字符串
-     *
-     * @param s 字符串
-     * @return 加密字符串
-     */
-    public static String md5(String s) {
-        char[] hexDigits =
-                {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
-        try {
-            byte[] btInput = s.getBytes("utf-8");
-            MessageDigest mdInst = MessageDigest.getInstance("MD5");
-            mdInst.update(btInput);
-            byte[] md = mdInst.digest();
-            int j = md.length;
-            char[] str = new char[j * 2];
-            int k = 0;
-            for (byte byte0 : md) {
-                str[k++] = hexDigits[byte0 >>> 4 & 0xf];
-                str[k++] = hexDigits[byte0 & 0xf];
-            }
-            return new String(str);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private StringUtil(){}
 }
