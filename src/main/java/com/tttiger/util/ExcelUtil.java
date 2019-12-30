@@ -13,8 +13,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * @param <T>
  * @author 秦浩桐
+ * @version 1.0
+ * @date 2019/09/28 20:20
  */
 public class ExcelUtil<T> {
 
@@ -92,7 +93,7 @@ public class ExcelUtil<T> {
                 for (Map.Entry<Field, Integer> entry : entries) {
                     Object obj = entry.getKey().get(tempObj);
                     XSSFCell cell = row.createCell(entry.getValue());
-                    cell.setCellStyle(style);
+//                    cell.setCellStyle(style);
                     setCellValue(entry.getKey(), cell, obj);
                 }
                 // 设置复合属性,关联属性
@@ -107,7 +108,7 @@ public class ExcelUtil<T> {
                         entry1.getKey().setAccessible(true);
                         Object obj2 = entry1.getKey().get(obj);
                         XSSFCell cell = row.createCell(entry1.getValue());
-                        cell.setCellStyle(style);
+//                        cell.setCellStyle(style);
                         setCellValue(entry1.getKey(), cell, obj2);
                     }
                 }
