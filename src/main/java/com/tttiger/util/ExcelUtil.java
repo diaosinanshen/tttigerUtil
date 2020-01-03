@@ -11,7 +11,6 @@ import java.io.OutputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
-import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -40,9 +39,15 @@ public class ExcelUtil<T> {
     private Map<Field, Map<Field, Integer>> associateMap = new HashMap<>();
 
     /**
-     * 保存导出标题
+     * 保存导出标题,与列宽度
      */
     private Map<String, Integer> headers = new LinkedHashMap<>();
+
+    /**
+     * 保存需要收集的属性，对应的列
+     */
+    private List<Integer> collectFieldIndex = new ArrayList<>();
+
 
     /**
      * 保存标题头样式
@@ -55,65 +60,111 @@ public class ExcelUtil<T> {
     private boolean hasCollect = false;
 
     /**
-     * 保存需要收集的属性
+     * 设置开始写入数据行
      */
-    private Map<Field, Integer> collectFieldMap = new HashMap<>();
+    private int startRow = 0;
     /**
-     * 保存收集的结果
+     * 设置开始写入数据列
      */
-    private Map<Integer, BigDecimal> collectResult = new HashMap<>();
+    private int startColumn = 0;
+
+    private int currentRow;
+    private int currentColumn;
+    /**
+     * 设置布尔值对应字符
+     */
+    private String booleanTrue = "是";
+    /**
+     * 设置布尔值对应字符
+     */
+    private String booleanFalse = "否";
+
+    /**
+     * 时间转换格式
+     */
+    private String datePattern = "yyyy-MM-dd HH:mm:ss";
+
+    private static String[] columnName = {"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"};
 
     /**
      * @param fileName 文件标题
      * @param data     集合数据
-     * @param response Http响应
-     * @throws IllegalAccessException
-     * @throws IOException
+     * @param response Http响应，内容直接写入response响应流
      */
     public void exportExcel(String fileName, List<T> data, HttpServletResponse response) throws IllegalAccessException, IOException {
         response.setCharacterEncoding("UTF-8");
         response.setContentType("application/vnd.ms-excel;charset=UTF-8");
         response.setHeader("Content-Disposition", "attachment;filename=" + fileName + ".xls");
-        ExportExcel(fileName, data, response.getOutputStream());
+        exportExcel(fileName, data, response.getOutputStream());
     }
 
+
     /**
-     * @param title   文件标题
-     * @param dataset 集合数据
-     * @param stream  导出流
-     * @throws IllegalAccessException
-     * @throws IOException
+     * 将数据写入一个workBook
+     * @param title sheet名称
+     * @param data 写入数据
+     * @return 写入数据后的 workbook
      */
-    public void ExportExcel(String title, List<T> dataset, OutputStream stream) throws IllegalAccessException, IOException {
-        if (dataset == null || dataset.isEmpty()) {
-            return;
+    public XSSFWorkbook exportExcel(String title, List<T> data) throws IllegalAccessException {
+        if (data == null || data.isEmpty()) {
+            return null;
         }
         // 初始化
-        init(dataset);
+        init(data);
         // 声明一个工作薄
         XSSFWorkbook workbook = new XSSFWorkbook();
         // 生成一个表格
         XSSFSheet sheet = workbook.createSheet(title);
+        // 设置表格标题行
+        setHeaders(workbook, sheet);
+        // 设置表体
+        setBody(workbook, sheet, data);
+        // 设置数据收集行
+        setCollect(workbook, sheet, data.size());
+        return workbook;
+    }
 
+    /**
+     * @param title  文件标题
+     * @param data   集合数据
+     * @param stream 导出流
+     */
+    public void exportExcel(String title, List<T> data, OutputStream stream) throws IllegalAccessException, IOException {
+        if (data == null || data.isEmpty()) {
+            return;
+        }
+        XSSFWorkbook workbook = exportExcel(title, data);
+        workbook.write(stream);
+    }
 
-        int startColumn = 0;
-        int startRow = 0;
+    /**
+     * 设置标题头
+     */
+    private void setHeaders(XSSFWorkbook workbook, XSSFSheet sheet) {
         // 设置标题行
         XSSFFont headerFont = workbook.createFont();
         XSSFCellStyle headerStyle = workbook.createCellStyle();
         this.excelHeaderBodyStyle.headerStyle(headerStyle, headerFont);
         headerStyle.setFont(headerFont);
-        XSSFRow row0 = sheet.createRow(startRow);
-        // 生成标题头
+        XSSFRow row = sheet.createRow(currentRow++);
+        this.excelHeaderBodyStyle.headerStyle(headerStyle, headerFont);
+        headerStyle.setFont(headerFont);
+        this.currentColumn = this.startColumn;
         for (Map.Entry<String, Integer> entry : headers.entrySet()) {
-            XSSFCell cell = row0.createCell(startColumn);
+            XSSFCell cell = row.createCell(currentColumn);
             cell.setCellValue(entry.getKey());
             cell.setCellStyle(headerStyle);
-            sheet.setColumnWidth(startColumn, entry.getValue());
-            startColumn++;
+            sheet.setColumnWidth(currentColumn, entry.getValue());
+            currentColumn++;
         }
+    }
 
-        int rowIndex = startRow + 1;
+    /**
+     * 设置表主体
+     *
+     * @param data 指定泛型集合数据
+     */
+    private void setBody(XSSFWorkbook workbook, XSSFSheet sheet, List<T> data) throws IllegalAccessException {
         XSSFCellStyle bodyStyle = workbook.createCellStyle();
         XSSFFont bodyFont = workbook.createFont();
         this.excelHeaderBodyStyle.bodyStyle(bodyStyle, bodyFont);
@@ -122,16 +173,14 @@ public class ExcelUtil<T> {
         Set<Map.Entry<Field, Integer>> entries = fieldMap.entrySet();
         // 设置复合属性,关联属性
         Set<Map.Entry<Field, Map<Field, Integer>>> tempEntry = associateMap.entrySet();
-        for (T tempObj : dataset) {
-            XSSFRow row = sheet.createRow(rowIndex);
+        for (T tempObj : data) {
+            XSSFRow row = sheet.createRow(currentRow++);
             // 设置普通属性
             for (Map.Entry<Field, Integer> entry : entries) {
                 Object obj = entry.getKey().get(tempObj);
                 XSSFCell cell = row.createCell(entry.getValue());
                 cell.setCellStyle(bodyStyle);
                 setCellValue(entry.getKey(), cell, obj);
-                // 尝试收集汇总数据
-                collectResult(entry, obj);
             }
             // 每个关联属性
             for (Map.Entry<Field, Map<Field, Integer>> mapEntry : tempEntry) {
@@ -145,43 +194,29 @@ public class ExcelUtil<T> {
                     XSSFCell cell = row.createCell(entry1.getValue());
                     cell.setCellStyle(bodyStyle);
                     setCellValue(entry1.getKey(), cell, obj2);
-                    collectResult(entry1, obj2);
                 }
             }
-            rowIndex++;
         }
-        if (hasCollect) {
-            XSSFRow resultRow = sheet.createRow(rowIndex);
-            XSSFCellStyle collectStyle = workbook.createCellStyle();
-            XSSFFont collectFont = workbook.createFont();
-            this.excelHeaderBodyStyle.collectStyle(collectStyle,collectFont);
-            collectStyle.setFont(collectFont);
-            for (Map.Entry<Integer, BigDecimal> entry : collectResult.entrySet()) {
-                XSSFCell resultCell = resultRow.createCell(entry.getKey());
-                resultCell.setCellStyle(collectStyle);
-                resultCell.setCellValue(entry.getValue().doubleValue());
-            }
-        }
-        workbook.write(stream);
-    }
-
-    private void setHeaders(XSSFRow row){
 
     }
 
     /**
-     * 收集汇总数据列
+     * 设置数据收集行
      */
-    private void collectResult(Map.Entry<Field, Integer> entry, Object object) throws IllegalAccessException {
-        if (this.hasCollect && collectFieldMap.get(entry.getKey()) != null) {
-            Integer collectIndex = collectFieldMap.get(entry.getKey());
-            entry.getKey().setAccessible(true);
-            if (collectResult.get(collectIndex) == null) {
-                collectResult.put(collectIndex, new BigDecimal(object + ""));
-            } else {
-                BigDecimal previousNum = collectResult.get(collectIndex);
-                BigDecimal afterNum = previousNum.add(new BigDecimal(object + ""));
-                collectResult.put(collectIndex, afterNum);
+    private void setCollect(XSSFWorkbook workbook, XSSFSheet sheet, Integer dataSize) {
+        if (hasCollect) {
+            XSSFRow collectRow = sheet.createRow(currentRow);
+            XSSFCellStyle collectStyle = workbook.createCellStyle();
+            XSSFFont collectFont = workbook.createFont();
+            this.excelHeaderBodyStyle.collectStyle(collectStyle,collectFont);
+            collectStyle.setFont(collectFont);
+            for (Integer index : collectFieldIndex) {
+                XSSFCell cell = collectRow.createCell(index);
+                cell.setCellStyle(collectStyle);
+                String coordinate = getCellCoordinate(currentRow - 1, index);
+                String coordinate2 = getCellCoordinate(currentRow - dataSize, index);
+
+                cell.setCellFormula("SUM(" + coordinate2 + ":" + coordinate + ")");
             }
         }
     }
@@ -204,6 +239,29 @@ public class ExcelUtil<T> {
     }
 
     /**
+     * 获取单元格对应的坐标如 0,0 返回 A1
+     *
+     * @param row    行数
+     * @param column 列数
+     * @return 坐标字符串
+     */
+    public String getCellCoordinate(int row, int column) {
+        StringBuilder name = new StringBuilder();
+        row++;
+        if (column < columnName.length) {
+            name.append(columnName[column]);
+        } else {
+            for (int i = 0; i < column / columnName.length; i++) {
+                name.append(columnName[0]);
+            }
+            name.append(columnName[column % columnName.length]);
+        }
+        name.append(row);
+        return name.toString();
+    }
+
+
+    /**
      * 为单元格设置值
      *
      * @param field 属性类型
@@ -217,7 +275,7 @@ public class ExcelUtil<T> {
                 ExcelFieldStatus annotation = field.getAnnotation(ExcelFieldStatus.class);
                 setStatusField(annotation, cell, value);
             } else {
-                throw new ExcelAnnotationException("Excel注解使用错误");
+                throw new ExcelAnnotationException("Excel注解使用错误：未指定@ExcelFieldStatus");
             }
         } else {
             setCellValue(cell, value);
@@ -242,7 +300,6 @@ public class ExcelUtil<T> {
                     return;
                 }
             }
-
         }
         setCellValue(cell, obj);
     }
@@ -254,34 +311,33 @@ public class ExcelUtil<T> {
      * @param value 原类型
      */
     private void setCellValue(XSSFCell cell, Object value) {
+        if (value == null) {
+            cell.setCellValue("");
+            return;
+        }
         String textValue = null;
-
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
         if (value instanceof Integer) {
             cell.setCellValue((Integer) value);
         } else if (value instanceof Float) {
-            textValue = String.valueOf((Float) value);
-            cell.setCellValue(textValue);
+            cell.setCellValue((Float) value);
         } else if (value instanceof Double) {
-            textValue = String.valueOf((Double) value);
-            cell.setCellValue(textValue);
+            cell.setCellValue((Double) value);
         } else if (value instanceof Long) {
             cell.setCellValue((Long) value);
-        }
-        if (value instanceof Boolean) {
-            textValue = "是";
+        } else if (value instanceof Boolean) {
+            textValue = this.booleanTrue;
             if (!(Boolean) value) {
-                textValue = "否";
+                textValue = this.booleanFalse;
             }
         } else if (value instanceof Date) {
+            SimpleDateFormat sdf = new SimpleDateFormat(this.datePattern);
             textValue = sdf.format((Date) value);
         } else {
-            // 其它数据类型都当作字符串简单处理
-            if (value != null) {
-                textValue = value.toString();
-            }
+            textValue = value.toString();
         }
+
         if (textValue != null) {
+            // 其它数据类型都当作字符串简单处理
             Matcher matcher = pattern.matcher(textValue);
             if (matcher.matches()) {
                 // 是数字当作double处理
@@ -301,7 +357,8 @@ public class ExcelUtil<T> {
      */
     private void init(List<T> entity) {
         Class<?> clazz = entity.get(0).getClass();
-
+        this.currentColumn = this.startColumn;
+        this.currentRow = this.startRow;
         // 获取表格默认表头，表体样式
         if (clazz.isAnnotationPresent(ExcelStyle.class)) {
             Class<? extends ExcelHeaderBodyStyle> styleClazz = clazz.getAnnotation(ExcelStyle.class).excelStyle();
@@ -309,7 +366,7 @@ public class ExcelUtil<T> {
                 Constructor<? extends ExcelHeaderBodyStyle> constructor = styleClazz.getConstructor();
                 this.excelHeaderBodyStyle = constructor.newInstance();
             } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
-                e.printStackTrace();
+                throw new ExcelAnnotationException("指定样式类无法创建:" + e.getMessage());
             }
         } else {
             this.excelHeaderBodyStyle = new DefaultExcelHeaderBodyStyle();
@@ -333,19 +390,18 @@ public class ExcelUtil<T> {
             return var1 - var2;
         });
         // 初始化标题头，和对应映射关系
-        int flag = 0;
         for (Field field : commonField) {
             if (field.isAnnotationPresent(ExcelField.class)) {
                 // 添加到标题头
                 ExcelField ex = field.getAnnotation(ExcelField.class);
                 headers.put(ex.value(), ex.width());
                 // 普通属性放入
-                fieldMap.put(field, flag);
+                fieldMap.put(field, currentColumn);
                 if (ex.collect()) {
                     this.hasCollect = true;
-                    collectFieldMap.put(field, flag);
+                    collectFieldIndex.add(currentColumn);
                 }
-                flag++;
+                currentColumn++;
             } else if (field.isAnnotationPresent(ExcelAssociate.class)) {
                 // 复合属性
                 String[] names = field.getAnnotation(ExcelAssociate.class).value();
@@ -359,17 +415,58 @@ public class ExcelUtil<T> {
                     ExcelField af = aField.getAnnotation(ExcelField.class);
                     headers.put(af.value(), af.width());
                     // 放入临时map
-                    tempMap.put(aField, flag);
+                    tempMap.put(aField, currentColumn);
                     if (af.collect()) {
                         this.hasCollect = true;
-                        collectFieldMap.put(field, flag);
+                        collectFieldIndex.add(currentColumn);
                     }
-                    flag++;
+                    currentColumn++;
                 }
                 // 复合属性与复合属性字段
                 associateMap.put(field, tempMap);
             }
         }
 
+    }
+
+
+    public int getStartRow() {
+        return startRow;
+    }
+
+    public void setStartRow(int startRow) {
+        this.startRow = startRow;
+    }
+
+    public int getStartColumn() {
+        return startColumn;
+    }
+
+    public void setStartColumn(int startColumn) {
+        this.startColumn = startColumn;
+    }
+
+    public String getBooleanTrue() {
+        return booleanTrue;
+    }
+
+    public void setBooleanTrue(String booleanTrue) {
+        this.booleanTrue = booleanTrue;
+    }
+
+    public String getBooleanFalse() {
+        return booleanFalse;
+    }
+
+    public void setBooleanFalse(String booleanFalse) {
+        this.booleanFalse = booleanFalse;
+    }
+
+    public String getDatePattern() {
+        return datePattern;
+    }
+
+    public void setDatePattern(String datePattern) {
+        this.datePattern = datePattern;
     }
 }

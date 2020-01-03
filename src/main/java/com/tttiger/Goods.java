@@ -27,11 +27,22 @@ public class Goods {
         type.setTypeName("食品");
         goods.setGoodsType(type);
 
+        Goods goods2 = new Goods();
+        goods2.setGoodsId("12312");
+        goods2.setGoodsName("商品名称");
+        goods2.setStatus(1);
+        goods2.setPrice(1.8);
+        GoodsType type2 = new GoodsType();
+        type2.setTypeId("999");
+        type2.setTypeName("食品");
+        goods2.setGoodsType(type2);
+
         ExcelUtil<Goods> util = new ExcelUtil<>();
         List<Goods> list = new ArrayList<>();
         list.add(goods);
+        list.add(goods2);
         OutputStream out = new FileOutputStream("E:/text.xls");
-        util.ExportExcel("test", list, out);
+        util.exportExcel("test", list, out);
     }
 
     private String goodsId;
