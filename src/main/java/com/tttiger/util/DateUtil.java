@@ -1,10 +1,19 @@
 package com.tttiger.util;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.Date;
+import java.util.Optional;
 
+
+/**
+ * @author 秦浩桐
+ * @version 1.0
+ * @date 2019/11/12 12:14
+ */
 public class DateUtil {
 
     /**
@@ -24,15 +33,9 @@ public class DateUtil {
      * @param date 日期实例
      * @return 格式化字符串
      */
-    public static String date2Str(Date date) {
-        SimpleDateFormat df = null;
-        String returnValue = "";
-        if (date != null) {
-            df = new SimpleDateFormat(DateUtil.DATE_PATTERN);
-            returnValue = df.format(date);
-        }
-
-        return (returnValue);
+    public static String date2Str(@Nonnull Date date) {
+        SimpleDateFormat df = new SimpleDateFormat(DateUtil.DATE_PATTERN);
+        return df.format(date);
     }
 
     /**
@@ -41,14 +44,9 @@ public class DateUtil {
      * @param date 日期实例
      * @return 格式化字符串
      */
-    public static String dateTime2Str(Date date) {
-        SimpleDateFormat df = null;
-        String returnValue = "";
-        if (date != null) {
-            df = new SimpleDateFormat(DateUtil.DATETIME_PATTERN);
-            returnValue = df.format(date);
-        }
-        return (returnValue);
+    public static String dateTime2Str(@Nonnull Date date) {
+        SimpleDateFormat df = new SimpleDateFormat(DateUtil.DATETIME_PATTERN);
+        return df.format(date);
     }
 
 
@@ -57,15 +55,9 @@ public class DateUtil {
      * @param date    日期实例
      * @return 格式化字符串
      */
-    public static String date2Str(String pattern, Date date) {
-        SimpleDateFormat df = null;
-        String returnValue = "";
-
-        if (date != null) {
-            df = new SimpleDateFormat(pattern);
-            returnValue = df.format(date);
-        }
-        return (returnValue);
+    public static String date2Str(@Nonnull String pattern, @Nonnull Date date) {
+        SimpleDateFormat df = new SimpleDateFormat(pattern);
+        return df.format(date);
     }
 
     /**
@@ -74,23 +66,20 @@ public class DateUtil {
      * @return 解析后的日期实例
      * 日期字符串解析异常返回 null
      */
-    public static Date str2Date(String pattern, String strDate) {
-        SimpleDateFormat df = null;
-        Date date = null;
-        df = new SimpleDateFormat(pattern);
+    public static Optional<Date> str2Date(@Nonnull String pattern, @Nullable String strDate) {
+        SimpleDateFormat df = new SimpleDateFormat(pattern);
         try {
-            date = df.parse(strDate);
+            return Optional.ofNullable(df.parse(strDate));
         } catch (ParseException pe) {
-            return null;
+            return Optional.empty();
         }
-        return date;
     }
 
     /**
      * @param strDate 日期字符串，格式化 yyyy-MM-dd
      * @return 解析日期
      */
-    public static Date str2Date(String strDate) {
+    public static Optional<Date> str2Date(@Nullable String strDate) {
         return str2Date(DateUtil.DATE_PATTERN, strDate);
     }
 
@@ -98,7 +87,7 @@ public class DateUtil {
      * @param strDate 日期字符串，格式化 yyyy-MM-dd
      * @return 解析日期
      */
-    public static Date str2DateTime(String strDate) {
+    public static Optional<Date> str2DateTime(@Nullable String strDate) {
         return str2Date(DateUtil.DATETIME_PATTERN, strDate);
     }
 
@@ -119,16 +108,9 @@ public class DateUtil {
      * @return 时间戳
      * 日期格式转换成时间戳
      */
-    public static long getTimeStamp(String pattern, String strDate) {
-        long returnTimeStamp = 0;
-        Date aDate = null;
-        aDate = str2Date(pattern, strDate);
-        if (aDate == null) {
-            return returnTimeStamp;
-        } else {
-            returnTimeStamp = aDate.getTime();
-        }
-        return returnTimeStamp;
+    public static Optional<Long> getTimeStamp(String pattern, String strDate) {
+        Optional<Date> dateOptional = str2Date(pattern, strDate);
+        return dateOptional.map(Date::getTime);
     }
 
 
@@ -137,9 +119,10 @@ public class DateUtil {
      *
      * @param startDate 开始时间
      * @param endDate   结束时间
-     * @return startDate是否是endDate之前
+     * @return startDate是否是endDate之前, 解析异常返回false
      */
-    public static boolean date1IsContainDate2(String startDate, String endDate, String pattern) {
+    public static boolean dateOneIsContainDateTwo(@Nullable String startDate, @Nullable String endDate,
+                                                  @Nonnull String pattern) {
         DateFormat df = new SimpleDateFormat(pattern);
         if (null == startDate || "".equals(startDate)) {
             return false;
@@ -154,11 +137,9 @@ public class DateUtil {
             end = df.parse(endDate);
         } catch (ParseException e) {
             e.printStackTrace();
-        }
-        if (begin.after(end)) {
             return false;
         }
-        return true;
+        return !begin.after(end);
     }
 
 
@@ -166,7 +147,7 @@ public class DateUtil {
      * 比较两个日期的年份是否一致
      *
      * @param beginDate 开始日期
-     * @param endDate 结束日期
+     * @param endDate   结束日期
      * @return 日期年份是否一致
      */
     public static boolean compareYear(String beginDate, String endDate) {
@@ -185,10 +166,7 @@ public class DateUtil {
         } catch (ParseException e) {
             e.printStackTrace();
         }
-        if (begin != null && end != null && begin.compareTo(end) == 0) {
-            return true;
-        }
-        return false;
+        return (begin != null && end != null && begin.compareTo(end) == 0);
     }
 
     /**
@@ -226,13 +204,9 @@ public class DateUtil {
         if (now == null || start == null || end == null) {
             return false;
         }
-        if (now.getTime() >= start.getTime() &&
-                now.getTime() <= end.getTime()) {
-            return true;
-        }
-        return false;
+        return (now.getTime() >= start.getTime() &&
+                now.getTime() <= end.getTime());
     }
-
 
     private DateUtil() {
     }

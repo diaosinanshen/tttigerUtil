@@ -29,4 +29,5 @@ public class GoodsType {
     public void setTypeName(String typeName) {
         this.typeName = typeName;
     }
+
 }

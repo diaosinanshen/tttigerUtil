@@ -1,6 +1,7 @@
 package com.tttiger.util;
 
 import com.tttiger.excel.DefaultExcelHeaderBodyStyle;
+import com.tttiger.excel.ExcelAnnotationException;
 import com.tttiger.excel.ExcelHeaderBodyStyle;
 import com.tttiger.excel.annotation.*;
 import org.apache.poi.xssf.usermodel.*;
@@ -201,7 +202,7 @@ public class ExcelUtil<T> {
     }
 
     /**
-     * 设置数据收集行
+     * 设置数据收集行，sum函数汇总
      */
     private void setCollect(XSSFWorkbook workbook, XSSFSheet sheet, Integer dataSize) {
         if (hasCollect) {
@@ -215,15 +216,14 @@ public class ExcelUtil<T> {
                 cell.setCellStyle(collectStyle);
                 String coordinate = getCellCoordinate(currentRow - 1, index);
                 String coordinate2 = getCellCoordinate(currentRow - dataSize, index);
-
                 cell.setCellFormula("SUM(" + coordinate2 + ":" + coordinate + ")");
             }
         }
+        currentRow++;
     }
 
     /**
      * 根据名字查找属性field
-     *
      * @param clazz 类
      * @param name  属性名
      * @return 找到的属性
@@ -371,7 +371,6 @@ public class ExcelUtil<T> {
         } else {
             this.excelHeaderBodyStyle = new DefaultExcelHeaderBodyStyle();
         }
-
         // 获取需要导出属性排序
         Field[] declaredFields = clazz.getDeclaredFields();
         List<Field> commonField = new ArrayList<>();
@@ -381,6 +380,7 @@ public class ExcelUtil<T> {
                 commonField.add(field);
             }
         }
+        // 根据Field指定顺序排序
         commonField.sort((x, y) -> {
             int var1 = x.isAnnotationPresent(ExcelField.class) ? x.getAnnotation(ExcelField.class).sort() :
                     x.getAnnotation(ExcelAssociate.class).sort();

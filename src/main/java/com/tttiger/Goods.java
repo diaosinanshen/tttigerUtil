@@ -3,6 +3,8 @@ package com.tttiger;
 import com.tttiger.excel.annotation.ExcelAssociate;
 import com.tttiger.excel.annotation.ExcelField;
 import com.tttiger.excel.annotation.Status;
+import com.tttiger.sql.SqlUtil;
+import com.tttiger.sql.annotation.TableField;
 import com.tttiger.util.ExcelUtil;
 
 import java.io.FileOutputStream;
@@ -24,7 +26,7 @@ public class Goods {
         goods.setPrice(1.8);
         GoodsType type = new GoodsType();
         type.setTypeId("999");
-        type.setTypeName("食品");
+        type.setTypeName(null);
         goods.setGoodsType(type);
 
         Goods goods2 = new Goods();
@@ -43,6 +45,8 @@ public class Goods {
         list.add(goods2);
         OutputStream out = new FileOutputStream("E:/text.xls");
         util.exportExcel("test", list, out);
+
+        System.out.println(SqlUtil.insertSql(goods));
     }
 
     private String goodsId;
@@ -55,6 +59,7 @@ public class Goods {
     private Integer status;
 
     @ExcelAssociate(value = {"typeId", "typeName"}, sort = -1)
+    @TableField(exist = false)
     private GoodsType goodsType;
 
     @ExcelField(value = "价格",collect = true)

@@ -1,5 +1,6 @@
-package com.tttiger.excel.annotation;
+package com.tttiger.excel;
 
+import com.tttiger.excel.annotation.ExcelFieldStyle;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.HorizontalAlignment;
 import org.apache.poi.ss.usermodel.VerticalAlignment;
