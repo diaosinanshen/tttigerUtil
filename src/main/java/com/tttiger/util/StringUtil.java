@@ -50,6 +50,7 @@ public class StringUtil {
      */
     public static String humpToUnderline(String para) {
         StringBuilder sb = new StringBuilder(para);
+        para = StringUtil.toLowerCaseFirstOne(para);
         int temp = 0;
         if (!para.contains(UNDERLINE)) {
             for (int i = 0; i < para.length(); i++) {

@@ -2,14 +2,15 @@ package com.tttiger.sql;
 
 import com.tttiger.sql.annotation.Table;
 import com.tttiger.sql.annotation.TableField;
-import com.tttiger.util.DateUtil;
+import com.tttiger.sql.annotation.TableId;
+import com.tttiger.sql.annotation.TableLogicalField;
+import com.tttiger.sql.exception.MissingNecessaryAnnotationException;
 import com.tttiger.util.ReflectUtil;
 import com.tttiger.util.StringUtil;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
 /**
@@ -21,36 +22,73 @@ import java.util.List;
  */
 public class SqlUtil {
 
-    public static <T> String insertSql(T entiry) {
-        StringBuilder sql = new StringBuilder("INSERT INTO ");
-
-        Class<?> clazz = entiry.getClass();
-        String tableName = getTableName(clazz);
-        // 添加表名
-        sql.append(tableName).append(" (");
-        // 获取存在表字段映射的属性
-        List<Field> existMappingField = getExistMappingField(clazz);
-        List<String> tableField = getTableField(existMappingField);
-        for (String fieldName : tableField) {
-            sql.append(fieldName).append(",");
+    protected static String getInsertDBStr(List<Field> fields, Object entity) {
+        StringBuilder fieldStr = new StringBuilder();
+        StringBuilder valueStr = new StringBuilder();
+        fieldStr.append("(");
+        valueStr.append(" VALUES(");
+        for (Field temp : fields) {
+            fieldStr.append(StringUtil.humpToUnderline(temp.getName())).append(",");
+            valueStr.append(getFieldSqlValue(temp, entity)).append(",");
         }
-        sql.deleteCharAt(sql.length() - 1);
-        sql.append(") VALUES(");
-        List<String> fieldSqlValue = getFieldSqlValue(existMappingField, entiry);
-        for (String sqlValue : fieldSqlValue) {
-            sql.append(sqlValue).append(",");
-        }
-        sql.deleteCharAt(sql.length() - 1);
-        sql.append(")");
-        return sql.toString();
+        fieldStr.deleteCharAt(fieldStr.length() - 1);
+        valueStr.deleteCharAt(valueStr.length() - 1);
+        fieldStr.append(")");
+        valueStr.append(")");
+        return fieldStr.append(valueStr).toString();
     }
 
-    private static List<String> getFieldSqlValue(List<Field> fields, Object entity) {
+    /**
+     * 获取属性对应的sql值的字符串
+     *
+     * @param field  属性
+     * @param entity 实体
+     * @return sql值字符串
+     */
+    protected static Object getFieldSqlValue(Field field, Object entity) {
+        try {
+            Object value = ReflectUtil.getValueUseGetterMethod(entity, field.getName());
+            return value;
+        } catch (NoSuchMethodException e) {
+            e.printStackTrace();
+        } catch (InvocationTargetException e) {
+            e.printStackTrace();
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        }
+        return "";
+    }
+
+    /**
+     * 获取属性对应的数据库字段名
+     *
+     * @param field 属性
+     * @return 数据库字段名
+     */
+    protected static String getFieldSqlName(Field field) {
+        if (field.isAnnotationPresent(TableId.class)
+                && StringUtil.isNotEmpty(field.getAnnotation(TableId.class).value())) {
+            return field.getAnnotation(TableId.class).value();
+        } else if (field.isAnnotationPresent(TableField.class)
+                && StringUtil.isNotEmpty(field.getAnnotation(TableField.class).value())) {
+            return field.getAnnotation(TableField.class).value();
+        } else {
+            return StringUtil.humpToUnderline(field.getName());
+        }
+    }
+
+    /**
+     * 将属性转为mysql对应类型的字符
+     *
+     * @param fields 属性
+     * @param entity 目标实体
+     * @return 属性对应数据库字符集合
+     */
+    protected static List<String> getFieldSqlValues(List<Field> fields, Object entity) {
         List<String> dbValue = new ArrayList<>();
         try {
             for (Field field : fields) {
-                Object value = null;
-                value = ReflectUtil.getValueUseGetterMethod(entity, field.getName());
+                Object value = ReflectUtil.getValueUseGetterMethod(entity, field.getName());
                 dbValue.add(SqlUtil.convertToDBValue(value));
             }
         } catch (NoSuchMethodException e) {
@@ -63,13 +101,29 @@ public class SqlUtil {
         return dbValue;
     }
 
-    private static String convertToDBValue(Object value) {
-        if (value instanceof String) {
-            return "`" + value + "`";
-        } else if (value instanceof Date) {
-            return "`" + DateUtil.date2Str((Date) value) + "`";
+    public static List<String> getFieldSqlNames(Class<?> clazz) {
+        List<String> names = new ArrayList<>();
+        Field[] declaredFields = clazz.getDeclaredFields();
+        for (Field field : declaredFields) {
+            if (field.isAnnotationPresent(TableField.class) && !field.getAnnotation(TableField.class).exist()) {
+                continue;
+            }
+            names.add(StringUtil.humpToUnderline(field.getName()));
         }
-        return value.toString();
+        return names;
+    }
+
+    /**
+     * java包装类型转为数据库对应类型
+     *
+     * @param value java类型
+     * @return 数据库类型字符
+     */
+    protected static String convertToDBValue(Object value) {
+        if (value instanceof String) {
+            return "'" + value + "'";
+        }
+        return value == null ? "null" : value.toString();
     }
 
     /**
@@ -79,7 +133,7 @@ public class SqlUtil {
      * @param fields 获取字段名属性集合
      * @return 对应字段名集合
      */
-    private static List<String> getTableField(List<Field> fields) {
+    protected static List<String> getTableField(List<Field> fields) {
         List<String> list = new ArrayList<>();
         for (Field field : fields) {
             if (field.isAnnotationPresent(TableField.class)
@@ -99,7 +153,7 @@ public class SqlUtil {
      * @param clazz 实体类型
      * @return 存在映射的非null可空集合
      */
-    private static List<Field> getExistMappingField(Class<?> clazz) {
+    protected static List<Field> getExistMappingField(Class<?> clazz) {
         Field[] declaredFields = clazz.getDeclaredFields();
         List<Field> fields = new ArrayList<>();
         for (Field field : declaredFields) {
@@ -117,11 +171,86 @@ public class SqlUtil {
      * @param clazz 实体类型
      * @return 表名
      */
-    private static String getTableName(Class<?> clazz) {
+    protected static String getTableName(Class<?> clazz) {
         if (clazz.isAnnotationPresent(Table.class)) {
             return clazz.getAnnotation(Table.class).value();
         }
-
         return StringUtil.humpToUnderline(clazz.getSimpleName());
     }
+
+
+    /**
+     * 获取@TableId标注的属性
+     *
+     * @param clazz 目标类型
+     * @return 标注了TableId注解的属性
+     */
+    protected static Field getTableIdField(Class<?> clazz) {
+        List<Field> idField = ReflectUtil.getFieldByAnnotation(clazz, TableId.class);
+        if (idField.isEmpty()) {
+            throw new MissingNecessaryAnnotationException("未指定@TableId注解");
+        }
+        return idField.get(0);
+    }
+
+    protected static boolean hasLogical(Class<?> clazz) {
+        Field[] declaredFields = clazz.getDeclaredFields();
+        for (Field field : declaredFields) {
+            if (field.isAnnotationPresent(TableLogicalField.class)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    protected static Field getLogicalField(Class<?> clazz) {
+        Field[] declaredFields = clazz.getDeclaredFields();
+        for (Field field : declaredFields) {
+            if (field.isAnnotationPresent(TableLogicalField.class)) {
+                return field;
+            }
+        }
+        return null;
+    }
+
+
+    protected static String getFieldAssignmentStr(Field field, Object entity) {
+        Object value = getFieldSqlValue(field, entity);
+        return getFieldSqlName(field) + " = " + value;
+    }
+
+
+    protected static String getDBFieldStr(Class<?> clazz) {
+        StringBuilder sql = new StringBuilder();
+        List<Field> existMappingField = getExistMappingField(clazz);
+        List<String> tableField = getTableField(existMappingField);
+        for (String fieldName : tableField) {
+            sql.append(fieldName).append(",");
+        }
+        sql.deleteCharAt(sql.length() - 1);
+        return sql.toString();
+    }
+
+
+    protected static String getDBFieldStr(List<Field> fields) {
+        StringBuilder sql = new StringBuilder();
+        List<String> tableField = getTableField(fields);
+        for (String fieldName : tableField) {
+            sql.append(fieldName).append(",");
+        }
+        sql.deleteCharAt(sql.length() - 1);
+        return sql.toString();
+    }
+
+    protected static String getIdFieldStr(Class<?> clazz) {
+        Field id = getTableIdField(clazz);
+        TableId annotation = id.getAnnotation(TableId.class);
+        String idFieldName = annotation.value();
+        if (StringUtil.isEmpty(annotation.value())) {
+            idFieldName = StringUtil.humpToUnderline(id.getName());
+        }
+        return " "+idFieldName+" ";
+    }
+
+
 }

@@ -3,23 +3,21 @@ package com.tttiger;
 import com.tttiger.excel.annotation.ExcelAssociate;
 import com.tttiger.excel.annotation.ExcelField;
 import com.tttiger.excel.annotation.Status;
-import com.tttiger.sql.SqlUtil;
+import com.tttiger.sql.annotation.Table;
 import com.tttiger.sql.annotation.TableField;
-import com.tttiger.util.ExcelUtil;
+import com.tttiger.sql.annotation.TableId;
+import com.tttiger.sql.annotation.TableLogicalField;
 
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * @author 秦浩桐
  */
+@Table("t_sx_goods")
 public class Goods {
 
     public static void main(String[] args) throws IOException, IllegalAccessException {
-        Goods goods = new Goods();
+       Goods goods = new Goods();
         goods.setGoodsId("12312");
         goods.setGoodsName("商品名称");
         goods.setStatus(1);
@@ -28,7 +26,7 @@ public class Goods {
         type.setTypeId("999");
         type.setTypeName(null);
         goods.setGoodsType(type);
-
+/*
         Goods goods2 = new Goods();
         goods2.setGoodsId("12312");
         goods2.setGoodsName("商品名称");
@@ -44,11 +42,11 @@ public class Goods {
         list.add(goods);
         list.add(goods2);
         OutputStream out = new FileOutputStream("E:/text.xls");
-        util.exportExcel("test", list, out);
-
-        System.out.println(SqlUtil.insertSql(goods));
+        util.exportExcel("test", list, out);*/
     }
 
+
+    @TableId
     private String goodsId;
     @ExcelField(value = "商品名称", sort = -2)
     private String goodsName;
@@ -64,6 +62,9 @@ public class Goods {
 
     @ExcelField(value = "价格",collect = true)
     private Double price;
+
+    @TableLogicalField
+    private Integer isExist;
 
     public String getGoodsId() {
         return goodsId;
@@ -99,6 +100,14 @@ public class Goods {
 
     public void setPrice(Double price) {
         this.price = price;
+    }
+
+    public Integer getIsExist() {
+        return isExist;
+    }
+
+    public void setIsExist(Integer isExist) {
+        this.isExist = isExist;
     }
 
     public void setGoodsType(GoodsType goodsType) {
