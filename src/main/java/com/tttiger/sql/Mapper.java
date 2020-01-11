@@ -66,4 +66,12 @@ public interface Mapper<T> {
      * @return 影响行数
      */
     int delete(Wrapper wrapper);
+
+
+    /**
+     * 返回sql执行器
+     *
+     * @return sql执行器
+     */
+    Executor<T> getExecutor();
 }

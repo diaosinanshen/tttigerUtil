@@ -11,7 +11,9 @@ import com.tttiger.util.StringUtil;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 指定实体类，生成通用mysql语句
@@ -29,7 +31,7 @@ public class SqlUtil {
         valueStr.append(" VALUES(");
         for (Field temp : fields) {
             fieldStr.append(StringUtil.humpToUnderline(temp.getName())).append(",");
-            valueStr.append(getFieldSqlValue(temp, entity)).append(",");
+            valueStr.append(SqlUtil.convertToDBValue(getFieldSqlValue(temp, entity))).append(",");
         }
         fieldStr.deleteCharAt(fieldStr.length() - 1);
         valueStr.deleteCharAt(valueStr.length() - 1);
@@ -249,7 +251,16 @@ public class SqlUtil {
         if (StringUtil.isEmpty(annotation.value())) {
             idFieldName = StringUtil.humpToUnderline(id.getName());
         }
-        return " "+idFieldName+" ";
+        return " " + idFieldName + " ";
+    }
+
+    public static Map<String, Field> getSqlNameFieldMapping(Class<?> clazz) {
+        List<Field> declaredFields = SqlUtil.getExistMappingField(clazz);
+        Map<String, Field> map = new HashMap<>();
+        for (Field field : declaredFields) {
+            map.put(getFieldSqlName(field), field);
+        }
+        return map;
     }
 
 

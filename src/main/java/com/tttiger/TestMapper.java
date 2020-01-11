@@ -1,7 +1,8 @@
 package com.tttiger;
 
 import com.tttiger.sql.BaseMapper;
-import com.tttiger.sql.Executor;
+
+import java.util.List;
 
 /**
  * @author 秦浩桐
@@ -12,18 +13,25 @@ public class TestMapper extends BaseMapper<Goods> {
     public static void main(String[] args) {
         Goods goods = new Goods();
         goods.setGoodsId("12312");
-        goods.setGoodsName("商品名称");
+        goods.setGoodsName("商品名称W");
         goods.setStatus(1);
         goods.setPrice(1.8);
         GoodsType type = new GoodsType();
         type.setTypeId("999");
         type.setTypeName(null);
         goods.setGoodsType(type);
+        goods.setIsExist(1);
         TestMapper mapper = new TestMapper();
 //        mapper.insert(goods);
 //        mapper.selectById("1");
-        mapper.updateById(goods);
 //        mapper.deleteById("1");
+        List<Goods> select = mapper.select(null);
+//        mapper.insert(goods);
+//       mapper.updateById(goods);
+//        QueryWrapper wrapper = new QueryWrapper();
+//        wrapper.gt("goods_id", 2);
+//        mapper.delete(wrapper);
+//        System.out.println(select);
 //        QueryWrapper wrapper2 = new QueryWrapper();
 //        QueryWrapper wrapper = new QueryWrapper();
 //        wrapper.eq("goods_name","a").or().eq("goods_name","b");
@@ -31,8 +39,4 @@ public class TestMapper extends BaseMapper<Goods> {
 //        mapper.select(wrapper);
     }
 
-    @Override
-    public Executor<Goods> getExecutor() {
-        return null;
-    }
 }

@@ -3,6 +3,7 @@ package com.tttiger.util;
 
 import javax.annotation.Nonnull;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -79,6 +80,22 @@ public class ReflectUtil {
             }
         }
         return list;
+    }
+
+    public static Object getInstance(Class<?> clazz) {
+        try {
+            Constructor<?> constructor = clazz.getConstructor(null);
+            return constructor.newInstance();
+        } catch (NoSuchMethodException e) {
+            e.printStackTrace();
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        } catch (InstantiationException e) {
+            e.printStackTrace();
+        } catch (InvocationTargetException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
 

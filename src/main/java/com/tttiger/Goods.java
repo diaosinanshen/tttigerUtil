@@ -13,7 +13,7 @@ import java.io.IOException;
 /**
  * @author 秦浩桐
  */
-@Table("t_sx_goods")
+@Table("goods")
 public class Goods {
 
     public static void main(String[] args) throws IOException, IllegalAccessException {

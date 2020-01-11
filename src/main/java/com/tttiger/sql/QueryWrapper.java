@@ -11,33 +11,38 @@ public class QueryWrapper implements Wrapper {
 
     private int orCount = 0;
 
-    public QueryWrapper eq(String field, String value) {
+    public QueryWrapper eq(String field, Object value) {
         condition.append(createCondition(field, "=", value));
         return this;
     }
 
-    public QueryWrapper ne(String field, String value) {
+    public QueryWrapper ne(String field, Object value) {
         condition.append(createCondition(field, "!=", value));
         return this;
     }
 
-    public QueryWrapper gt(String field, String value) {
+    public QueryWrapper gt(String field, Object value) {
         condition.append(createCondition(field, ">", value));
         return this;
     }
 
-    public QueryWrapper ge(String field, String value) {
+    public QueryWrapper ge(String field, Object value) {
         condition.append(createCondition(field, ">=", value));
         return this;
     }
 
-    public QueryWrapper lt(String field, String value) {
+    public QueryWrapper lt(String field, Object value) {
         condition.append(createCondition(field, "<", value));
         return this;
     }
 
-    public QueryWrapper le(String field, String value) {
+    public QueryWrapper le(String field, Object value) {
         condition.append(createCondition(field, "<=", value));
+        return this;
+    }
+
+    public QueryWrapper like(String field, Object value) {
+        condition.append(createCondition(field, "like", "%" + value + "%"));
         return this;
     }
 
