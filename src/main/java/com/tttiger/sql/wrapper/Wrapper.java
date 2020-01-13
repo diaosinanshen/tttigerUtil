@@ -1,4 +1,4 @@
-package com.tttiger.sql;
+package com.tttiger.sql.wrapper;
 
 /**
  * @author 秦浩桐

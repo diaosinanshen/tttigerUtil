@@ -17,5 +17,5 @@ public enum IdType {
     /**
      * 主键为主键生成器生成
      */
-    CREATOR
+    GENERATOR
 }

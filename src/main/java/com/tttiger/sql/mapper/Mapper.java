@@ -1,4 +1,7 @@
-package com.tttiger.sql;
+package com.tttiger.sql.mapper;
+
+import com.tttiger.sql.wrapper.Wrapper;
+import com.tttiger.sql.executor.SqlExecutor;
 
 import java.io.Serializable;
 import java.util.List;
@@ -73,5 +76,5 @@ public interface Mapper<T> {
      *
      * @return sql执行器
      */
-    Executor<T> getExecutor();
+    SqlExecutor<T> getExecutor();
 }

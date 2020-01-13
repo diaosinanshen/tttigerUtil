@@ -1,10 +1,13 @@
-package com.tttiger.sql;
+package com.tttiger.sql.mapper;
 
+import com.tttiger.sql.*;
 import com.tttiger.sql.annotation.TableId;
 import com.tttiger.sql.constant.Logical;
-import com.tttiger.sql.constant.SqlResultType;
-import com.tttiger.sql.constant.SqlType;
-import com.tttiger.util.StringUtil;
+import com.tttiger.sql.exception.MoreResultException;
+import com.tttiger.sql.executor.DefaultSqlExecutor;
+import com.tttiger.sql.executor.SqlExecutor;
+import com.tttiger.sql.handler.TestDataSourceSupplier;
+import com.tttiger.sql.wrapper.Wrapper;
 
 import java.io.Serializable;
 import java.lang.reflect.Field;
@@ -41,7 +44,7 @@ public abstract class BaseMapper<T> implements Mapper<T> {
     /**
      * 实体主键属性
      */
-    private Field id;
+    private Field idField;
     /**
      * 实体逻辑删除属性对应表字段名
      */
@@ -51,59 +54,42 @@ public abstract class BaseMapper<T> implements Mapper<T> {
      */
     private Field logical;
 
+    private MapperConfiguration configuration;
+
     /**
      * sql执行器
      */
-    private Executor<T> executor;
+    private SqlExecutor<T> executor;
+    /**
+     * id生成器
+     */
+    private IdGenerator<String> idGenerator = new UuidGenerator();
 
 
     @Override
     public List<T> select(Wrapper wrapper) {
-        StringBuilder sql = new StringBuilder(SqlWord.SELECT);
-        sql.append(fieldsName);
-        sql.append(SqlWord.FROM).append(tableName);
-        setWrapper(sql, wrapper);
-        setLogicalCondition(sql, wrapper);
-        SqlMethod sqlMethod = new SqlMethod(sql.toString(), SqlType.SELECT_TYPE, SqlResultType.EXPECT_RESULT_LIST);
+        SqlMethod sqlMethod = SqlBuilder.buildSelect(wrapper, configuration);
         Result execute = executor.execute(sqlMethod);
         return (List<T>) execute.getResult();
     }
 
-    protected void setLogicalCondition(StringBuilder sql, Wrapper wrapper) {
-        if (logical != null && wrapper != null && StringUtil.isNotEmpty(wrapper.getConditionSql())) {
-            sql.append(SqlWord.AND).append(logicalName).append(SqlWord.EQ).append(Logical.EXIST);
-        } else if (logical != null && (wrapper == null || StringUtil.isEmpty(wrapper.getConditionSql()))) {
-            sql.append(SqlWord.WHERE).append(logicalName).append(SqlWord.EQ).append(Logical.EXIST);
-        }
-    }
-
     @Override
     public T selectById(Serializable id) {
-        StringBuilder sql = new StringBuilder(SqlWord.SELECT);
-        sql.append(fieldsName);
-        sql.append(SqlWord.FROM).append(tableName).append(SqlWord.WHERE)
-                .append(idName).append(SqlWord.EQ).append(SqlUtil.convertToDBValue(id));
-        SqlMethod sqlMethod = new SqlMethod(sql.toString(), SqlType.SELECT_TYPE, SqlResultType.EXPECT_RESULT_LIST);
+        SqlMethod sqlMethod = SqlBuilder.buildSelectById(id, configuration);
         Result execute = executor.execute(sqlMethod);
         List resultList = (List) execute.getResult();
         if (resultList == null || resultList.isEmpty()) {
             return null;
         }
         if (resultList.size() > 1) {
-            // 返回结果过多抛出异常
+            throw new MoreResultException("返回过多的结果");
         }
         return (T) resultList.get(0);
     }
 
     @Override
     public boolean insert(T t) {
-        StringBuilder sql = new StringBuilder(SqlWord.INSERT);
-        sql.append(SqlWord.INTO);
-        // 添加表名
-        sql.append(tableName);
-        // 获取存在表字段映射的属性
-        sql.append(SqlUtil.getInsertDBStr(fields, t));
-        SqlMethod sqlMethod = new SqlMethod(sql.toString(), SqlType.INSERT_TYPE, SqlResultType.EXPECT_RESULT_INT);
+        SqlMethod sqlMethod = SqlBuilder.buildInsert(t,configuration);
         Result execute = executor.execute(sqlMethod);
         return ((int) execute.getResult()) == 1;
     }
@@ -121,8 +107,8 @@ public abstract class BaseMapper<T> implements Mapper<T> {
                     .append(SqlWord.EQ).append(SqlUtil.convertToDBValue(fieldValue)).append(",");
         }
         sql.deleteCharAt(sql.length() - 1);
-        sql.append(SqlWord.WHERE).append(SqlUtil.getFieldAssignmentStr(id, t));
-        SqlMethod sqlMethod = new SqlMethod(sql.toString(), SqlType.UPDATE_TYPE, SqlResultType.EXPECT_RESULT_INT);
+        sql.append(SqlWord.WHERE).append(SqlUtil.getFieldAssignmentStr(idField, t));
+        SqlMethod sqlMethod = new SqlMethod(sql.toString());
         Result execute = executor.execute(sqlMethod);
         return ((int) execute.getResult()) == 1;
     }
@@ -141,7 +127,7 @@ public abstract class BaseMapper<T> implements Mapper<T> {
         }
         sql.deleteCharAt(sql.length() - 1);
         setWrapper(sql, wrapper);
-        SqlMethod sqlMethod = new SqlMethod(sql.toString(), SqlType.UPDATE_TYPE, SqlResultType.EXPECT_RESULT_INT);
+        SqlMethod sqlMethod = new SqlMethod(sql.toString());
         Result execute = executor.execute(sqlMethod);
         return (int) execute.getResult();
     }
@@ -158,7 +144,7 @@ public abstract class BaseMapper<T> implements Mapper<T> {
             sql.append(logicalName).append(SqlWord.EQ).append(Logical.DELETED);
             sql.append(SqlWord.WHERE).append(idName).append(SqlWord.EQ).append(SqlUtil.convertToDBValue(id));
         }
-        SqlMethod sqlMethod = new SqlMethod(sql.toString(), SqlType.DELETE_TYPE, SqlResultType.EXPECT_RESULT_INT);
+        SqlMethod sqlMethod = new SqlMethod(sql.toString());
         Result execute = executor.execute(sqlMethod);
         return (int) execute.getResult() == 1;
     }
@@ -175,7 +161,7 @@ public abstract class BaseMapper<T> implements Mapper<T> {
             sql.append(logicalName).append(SqlWord.EQ).append(Logical.DELETED);
             sql.append(SqlWord.WHERE).append(wrapper.getConditionSql());
         }
-        SqlMethod sqlMethod = new SqlMethod(sql.toString(), SqlType.DELETE_TYPE, SqlResultType.EXPECT_RESULT_INT);
+        SqlMethod sqlMethod = new SqlMethod(sql.toString());
         Result execute = executor.execute(sqlMethod);
         return (int) execute.getResult();
     }
@@ -184,6 +170,7 @@ public abstract class BaseMapper<T> implements Mapper<T> {
     public BaseMapper() {
         setGenericsType();
         init();
+        this.configuration = new MapperConfiguration(setGenericsType());
     }
 
     /**
@@ -194,7 +181,7 @@ public abstract class BaseMapper<T> implements Mapper<T> {
         this.fieldsName = SqlUtil.getDBFieldStr(clazz);
         this.idName = SqlUtil.getIdFieldStr(clazz);
         this.fields = SqlUtil.getExistMappingField(clazz);
-        this.id = SqlUtil.getTableIdField(clazz);
+        this.idField = SqlUtil.getTableIdField(clazz);
         this.logical = SqlUtil.getLogicalField(clazz);
         if (logical != null) {
             this.logicalName = SqlUtil.getFieldSqlName(logical);
@@ -205,17 +192,18 @@ public abstract class BaseMapper<T> implements Mapper<T> {
     /**
      * 获取父类泛型
      */
-    private void setGenericsType() {
+    private Class<?> setGenericsType() {
         ParameterizedType pt = (ParameterizedType) getClass().getGenericSuperclass();
         clazz = (Class) pt.getActualTypeArguments()[0];
+        return clazz;
     }
 
     /**
      * 指定语句执行器
      */
     @Override
-    public Executor<T> getExecutor() {
-        return new DefaultExecutor<>(null, clazz);
+    public SqlExecutor<T> getExecutor() {
+        return new DefaultSqlExecutor<>(new TestDataSourceSupplier(), clazz);
     }
 
     private void setWrapper(StringBuilder sql, Wrapper wrapper) {

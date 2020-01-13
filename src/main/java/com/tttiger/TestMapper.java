@@ -1,6 +1,6 @@
 package com.tttiger;
 
-import com.tttiger.sql.BaseMapper;
+import com.tttiger.sql.mapper.BaseMapper;
 
 import java.util.List;
 
@@ -26,6 +26,9 @@ public class TestMapper extends BaseMapper<Goods> {
 //        mapper.selectById("1");
 //        mapper.deleteById("1");
         List<Goods> select = mapper.select(null);
+        System.out.println(select.size());
+//        String str = " a a ";
+//        System.out.println(str.trim());
 //        mapper.insert(goods);
 //       mapper.updateById(goods);
 //        QueryWrapper wrapper = new QueryWrapper();

@@ -1,11 +1,14 @@
-package com.tttiger.sql;
+package com.tttiger.sql.executor;
+
+import com.tttiger.sql.Result;
+import com.tttiger.sql.SqlMethod;
 
 /**
  * @author 秦浩桐
  * @version 1.0
  * @date 2020/01/10 16:51
  */
-public interface Executor<T> {
+public interface SqlExecutor<T> {
 
     /**
      * 执行sql方法返回处理结果

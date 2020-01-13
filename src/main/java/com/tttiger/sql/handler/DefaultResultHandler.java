@@ -1,11 +1,13 @@
 package com.tttiger.sql.handler;
 
 import com.tttiger.sql.Result;
+import com.tttiger.sql.SqlType;
 import com.tttiger.sql.SqlUtil;
 import com.tttiger.util.ReflectUtil;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -20,48 +22,43 @@ import java.util.Set;
  */
 public class DefaultResultHandler<T> extends AbstractResultHandler<T> {
 
-    private Class<?> handleType;
 
     private Map<String, Field> sqlNameFieldMapping;
 
 
     public DefaultResultHandler(Class<?> handleType) {
         super(handleType);
-        this.handleType = handleType;
         this.sqlNameFieldMapping = SqlUtil.getSqlNameFieldMapping(handleType);
     }
 
 
     @Override
-    public Result handleListResult(ResultSet resultSet) {
-        List<T> list = new ArrayList<>();
+    public Result handleListResult(PreparedStatement preparedStatement, SqlType sqlType) {
+
+        Result result = new Result();
         try {
-            Set<Map.Entry<String, Field>> entries = sqlNameFieldMapping.entrySet();
-            ReflectUtil.getInstance(handleType);
-            while (resultSet.next()) {
-                T t = buildObject();
-                for (Map.Entry<String, Field> entry : entries) {
-                    int column = resultSet.findColumn(entry.getKey());
-                    setAttribute(entry.getValue(), t, resultSet.getObject(column));
+            if (sqlType == SqlType.SELECT) {
+                List<T> list = new ArrayList<>();
+                ResultSet resultSet = preparedStatement.getResultSet();
+                Set<Map.Entry<String, Field>> entries = sqlNameFieldMapping.entrySet();
+                ReflectUtil.getInstance(handleType);
+                while (resultSet.next()) {
+                    T t = buildObject();
+                    for (Map.Entry<String, Field> entry : entries) {
+                        int column = resultSet.findColumn(entry.getKey());
+                        setAttribute(entry.getValue(), t, resultSet.getObject(column));
+                    }
+                    list.add(t);
                 }
-                list.add(t);
+                result.setResult(list);
+            } else {
+
+                result.setResult(preparedStatement.getUpdateCount());
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        Result result = new Result();
-        result.setResult(list);
         return result;
-    }
-
-    @Override
-    public Result handleIntResult(ResultSet resultSet) {
-        return null;
-    }
-
-    @Override
-    public Result getResult() {
-        return null;
     }
 
 
@@ -93,8 +90,6 @@ public class DefaultResultHandler<T> extends AbstractResultHandler<T> {
             e.printStackTrace();
         }
     }
-
-
 
 
     private T buildObject() {

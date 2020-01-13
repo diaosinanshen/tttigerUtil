@@ -7,11 +7,14 @@ package com.tttiger.sql;
  */
 public class SqlMethod {
 
+    /**
+     * 执行的sql语句
+     */
     private String sql;
-
-    private int sqlType;
-
-    private int expectResultType;
+    /**
+     * sql 类型
+     */
+    private SqlType sqlType;
 
     public String getSql() {
         return sql;
@@ -21,25 +24,34 @@ public class SqlMethod {
         this.sql = sql;
     }
 
-    public int getSqlType() {
+
+    public SqlMethod(String sql) {
+        this.sql = sql;
+        pareseSqlType(sql);
+    }
+
+    public SqlType getSqlType() {
         return sqlType;
     }
 
-    public void setSqlType(int sqlType) {
-        this.sqlType = sqlType;
-    }
-
-    public int getExpectResultType() {
-        return expectResultType;
-    }
-
-    public void setExpectResultType(int expectResultType) {
-        this.expectResultType = expectResultType;
-    }
-
-    public SqlMethod(String sql, int sqlType, int expectResultType) {
-        this.sql = sql;
-        this.sqlType = sqlType;
-        this.expectResultType = expectResultType;
+    private void pareseSqlType(String sql) {
+        String str = sql.trim().toUpperCase();
+        str = str.substring(0,6);
+        switch (str) {
+            case "SELECT":
+                this.sqlType = SqlType.SELECT;
+                break;
+            case "DELETE":
+                this.sqlType = SqlType.DELETE;
+                break;
+            case "UPDATE":
+                this.sqlType = SqlType.UPDATE;
+                break;
+            case "INSERT":
+                this.sqlType = SqlType.SELECT;
+                break;
+            default:
+                throw new RuntimeException();
+        }
     }
 }

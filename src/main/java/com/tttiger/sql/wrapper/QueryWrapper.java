@@ -1,4 +1,7 @@
-package com.tttiger.sql;
+package com.tttiger.sql.wrapper;
+
+import com.tttiger.sql.SqlUtil;
+import com.tttiger.sql.SqlWord;
 
 /**
  * @author 秦浩桐
