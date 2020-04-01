@@ -3,17 +3,12 @@ package com.tttiger;
 import com.tttiger.excel.annotation.ExcelAssociate;
 import com.tttiger.excel.annotation.ExcelField;
 import com.tttiger.excel.annotation.Status;
-import com.tttiger.sql.annotation.Table;
-import com.tttiger.sql.annotation.TableField;
-import com.tttiger.sql.annotation.TableId;
-import com.tttiger.sql.annotation.TableLogicalField;
 
 import java.io.IOException;
 
 /**
  * @author 秦浩桐
  */
-@Table("goods")
 public class Goods {
 
     public static void main(String[] args) throws IOException, IllegalAccessException {
@@ -46,7 +41,6 @@ public class Goods {
     }
 
 
-    @TableId
     private String goodsId;
     @ExcelField(value = "商品名称", sort = -2)
     private String goodsName;
@@ -57,13 +51,11 @@ public class Goods {
     private Integer status;
 
     @ExcelAssociate(value = {"typeId", "typeName"}, sort = -1)
-    @TableField(exist = false)
     private GoodsType goodsType;
 
     @ExcelField(value = "价格",collect = true)
     private Double price;
 
-    @TableLogicalField
     private Integer isExist;
 
     public String getGoodsId() {
